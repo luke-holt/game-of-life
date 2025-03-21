@@ -1,54 +1,35 @@
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include <stddef.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 #include "raylib.h"
 
 
-#define BIT(n) (1 << (n))
-#define BITVAL(byte, bit) (((byte) >> (bit)) & 1)
-
 #define BITS_IN_U64 (64)
+
 #define XORSHIFT128_RAND_MAX ((uint32_t)0xFFFFFFFFu)
-
-const int fps = 60;
-const int pxw = 128;
-const int pxh = 64;
-const int pxsz = 4;
-const int scw = pxw*pxsz;
-const int sch = pxh*pxsz;
-
-uint32_t xorshiftstate[4] = {
-    0x89583899, 0xa809fa8d,
-    0x23095280, 0x2f8d0298,
-};
-
-
+uint32_t xorshiftstate[4] = { 0x89583899, 0xa809fa8d, 0x23095280, 0x2f8d0298 };
 uint32_t xorshift128(uint32_t *state);
-
-/*
- * Conditions for next cell to live
- * 1. live cell with two or three live neighbours
- * 2. dead cell with exactly three live neighbours
- */
 
 int
 main(void)
 {
+    const int fps = 30;
+    const int pxsz = 2;
+    const int scw = BITS_IN_U64 * 12 - 2 * pxsz;
+    const int sch = BITS_IN_U64 *  8 - 2 * pxsz;
+    const int pxw = BITS_IN_U64 * 12 / pxsz;
+    const int pxh = BITS_IN_U64 *  8 / pxsz;
+    const int row_words = pxw / BITS_IN_U64;
+    const int len = (pxh * row_words);
+
     InitWindow(scw, sch, "Conway's Game of Life");
     SetTargetFPS(fps);
 
-    int row_words = pxw / BITS_IN_U64;
-    const int len = (pxh * row_words);
-    uint64_t *buf = malloc(2 * len * sizeof(uint64_t));
-
+    uint64_t *buf = malloc(2 * len * sizeof(*buf));
     uint64_t *cur = buf;
     uint64_t *prv = &buf[len];
 
-    for (size_t i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         cur[i] = (uint64_t)xorshift128(xorshiftstate) |
                  (uint64_t)xorshift128(xorshiftstate) << 32;
         prv[i] = cur[i];
@@ -67,17 +48,17 @@ main(void)
     };
 
     while (!WindowShouldClose()) {
-#if 1
+
         uint64_t topw, midw, botw, word;
-        uint8_t topi, midi, boti, bitcount;
-        bool live, next;
-        for (size_t j = 1; j < pxh - 1; j++) {
+        int topi, midi, boti, bitcount;
+        uint8_t live, next;
+        for (int j = 1; j < pxh - 1; j++) {
 
             topi = (j - 1) * row_words;
             midi = j * row_words;
             boti = (j + 1) * row_words;
 
-            for (size_t i = 0; i < row_words; i++) {
+            for (int i = 0; i < row_words; i++) {
                 topw = prv[topi + i];
                 midw = prv[midi + i];
                 botw = prv[boti + i];
@@ -110,7 +91,7 @@ main(void)
                 }
 
                 // within word
-                for (size_t bit = 1; bit < BITS_IN_U64 - 1; bit++) {
+                for (int bit = 1; bit < BITS_IN_U64 - 1; bit++) {
                     bitcount = lut[(topw >> (bit - 1)) & 0x7] + // 111
                                lut[(midw >> (bit - 1)) & 0x5] + // 101
                                lut[(botw >> (bit - 1)) & 0x7];  // 111
@@ -122,18 +103,16 @@ main(void)
                 cur[midi + i] = word;
             }
         }
-#endif
-        BeginDrawing();
-        // ClearBackground(BLACK);
 
-        for (size_t j = 0; j < pxh; j++) {
-            for (size_t i = 0; i < pxw; i++) {
-                size_t idx = j * row_words + i / BITS_IN_U64;
-                size_t bit = i & (BITS_IN_U64 - 1);
+        BeginDrawing();
+        ClearBackground(BLACK);
+
+        for (int j = 1; j < pxh-1; j++) {
+            for (int i = 1; i < pxw-1; i++) {
+                int idx = j * row_words + i / BITS_IN_U64;
+                int bit = i & (BITS_IN_U64 - 1);
                 if ((cur[idx] >> bit) & 1)
-                    DrawRectangle(i * pxsz, j * pxsz, pxsz, pxsz, RAYWHITE);
-                else
-                    DrawRectangle(i * pxsz, j * pxsz, pxsz, pxsz, BLACK);
+                    DrawRectangle((i - 1) * pxsz, (j - 1) * pxsz, pxsz, pxsz, RAYWHITE);
             }
         }
 
